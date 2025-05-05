@@ -1,88 +1,87 @@
 import time
+from pathlib import Path
+
 from fastapi import UploadFile, HTTPException
 import os
 from pymediainfo import MediaInfo
 
 from app.utils.viewer_count import get_viewer_count
 
-_video_state = {
-    "filename": None,
-    "start_time": None,
-    "expected_end_time": None
+VIDEO_DIR = Path("shared_video")          # <- KEEP in sync with main.py
+VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+
+_video_state: dict[str, float | str | None] = {
+    "filename": None,          # str | None
+    "start_time": None,        # float | None (epoch seconds)
+    "expected_end": None,      # float | None
 }
 
+def _parse_duration(path: Path) -> float:
+    """Return video duration in seconds (float)."""
+    media = MediaInfo.parse(path)
+    for track in media.tracks:
+        if track.track_type == "Video" and track.duration:          # ms
+            return float(track.duration) / 1000.0
+    raise RuntimeError("No video track found")
 
-async def upload_video(file: UploadFile):
-    check_and_expire_video()
 
+def _expire_if_finished() -> None:
+    """Clear state when the current video has finished playing."""
+    if _video_state["expected_end"] and time.time() >= _video_state["expected_end"]:
+        _video_state.update(filename=None, start_time=None, expected_end=None)
+
+# --------------------------------------------------------------------------- #
+# public API used by the routers
+# --------------------------------------------------------------------------- #
+async def upload_video(file: UploadFile) -> dict:
+    """Save the file and start a new session. Raises 409 if one is active."""
+    _expire_if_finished()
     if _video_state["filename"]:
         raise HTTPException(status_code=409, detail="Video already playing")
 
-    os.makedirs("shared_video", exist_ok=True)
+    target = VIDEO_DIR / file.filename
     contents = await file.read()
-    path = f"shared_video/{file.filename}"
-    with open(path, "wb") as f:
-        f.write(contents)
+    target.write_bytes(contents)
 
     try:
-        duration = get_video_duration(path)
-    except Exception as e:
+        duration = _parse_duration(target)
+    except Exception as e:                      # duration extraction failed
+        target.unlink(missing_ok=True)
         raise HTTPException(status_code=400, detail=f"Failed to parse duration: {e}")
 
-    _video_state["filename"] = file.filename
-    _video_state["start_time"] = time.time()
-    _video_state["expected_end_time"] = _video_state["start_time"] + duration
-
-    return {"message": "Video uploaded", "filename": file.filename, "duration": duration}
-
-
-def get_video_duration(path):
-    media_info = MediaInfo.parse(path)
-    for track in media_info.tracks:
-        if track.track_type == "Video":
-            return float(track.duration) / 1000
-    raise Exception("No video track found")
+    now = time.time()
+    _video_state.update(
+        filename=file.filename,
+        start_time=now,
+        expected_end=now + duration,
+    )
+    return {"message": "video uploaded", "filename": file.filename, "duration": duration}
 
 
-def get_video_status():
-    check_and_expire_video()
-
+def get_video_status() -> dict:
+    """Return current state − called by /status."""
+    _expire_if_finished()
     if not _video_state["filename"]:
-        return {"status": "no_video"}
+        return {"status": "idle"}
 
-    elapsed = time.time() - _video_state["start_time"]
+    elapsed = time.time() - float(_video_state["start_time"])      # type: ignore
     return {
+        "status": "playing",
         "filename": _video_state["filename"],
         "elapsed": elapsed,
-        "status": "playing",
-        "viewers": get_viewer_count()
+        "viewers": get_viewer_count(),
     }
 
 
+def end_video() -> None:
+    """Force‑stop the current session."""
+    _video_state.update(filename=None, start_time=None, expected_end=None)
 
 
-def end_video():
-    _video_state["filename"] = None
-    _video_state["start_time"] = None
-    _video_state["duration"] = None
-
-
-def get_video_filename_path():
-    check_and_expire_video()
-
+def get_video_filename_path() -> tuple[str, str]:
+    """Return (absolute_path, filename) for the current file or 404."""
+    _expire_if_finished()
     if not _video_state["filename"]:
         raise HTTPException(status_code=404, detail="No video playing")
-
-    path = f"shared_video/{_video_state['filename']}"
-    return path, _video_state["filename"]
-
-
-def check_and_expire_video():
-    if _video_state["expected_end_time"] and time.time() >= _video_state["expected_end_time"]:
-        end_video()
-
-
-def end_video():
-    _video_state["filename"] = None
-    _video_state["start_time"] = None
-    _video_state["expected_end_time"] = None
+    path = VIDEO_DIR / _video_state["filename"]
+    return str(path), _video_state["filename"]
