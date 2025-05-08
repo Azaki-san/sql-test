@@ -7,6 +7,17 @@ on:
     branches: [ main ]
 
 jobs:
+  sonarqube:
+    name: SonarQube
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
   code-analysis:
     runs-on: ubuntu-latest
 
@@ -28,18 +39,6 @@ jobs:
 
     - name: Install project dependencies
       run: poetry install --no-interaction --no-root
-
-    # SonarQube Analysis (existing)
-    - name: SonarQube
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v4
-          with:
-            fetch-depth: 0
-        - name: SonarQube Scan
-          uses: SonarSource/sonarqube-scan-action@v5
-          env:
-            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
     # Linters (existing)
     - name: Run Ruff
