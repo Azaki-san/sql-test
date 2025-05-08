@@ -50,7 +50,7 @@ jobs:
       run: poetry run flake8 ./app
 
     - name: Run Bandit
-      run: poetry run bandit -r ./app -c .bandit.yaml
+      run: poetry run bandit -r ./app -c .bandit.yml
 
     # Updated Snyk integration
     - name: Setup Snyk
