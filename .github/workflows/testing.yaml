@@ -17,14 +17,19 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.x'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install ruff flake8 bandit
+    # Poetry installation
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        virtualenvs-create: false
+        installer-parallel: true
 
-    # SonarQube Analysis
+    - name: Install project dependencies
+      run: poetry install --no-interaction --no-root
+
+    # SonarQube Analysis (existing)
 #    - name: SonarQube Scan
 #      uses: SonarSource/sonarcloud-github-action@master
 #      env:
@@ -37,24 +42,21 @@ jobs:
 #          -Dsonar.python.version=3
 #          -Dsonar.sources=./app
 
-    # Ruff Linting
+    # Linters (existing)
     - name: Run Ruff
-      run: ruff check ./app
+      run: poetry run ruff check ./app
 
-    # Flake8 Linting
     - name: Run Flake8
-      run: flake8 ./app
+      run: poetry run flake8 ./app
 
-    # Bandit Security Scan
     - name: Run Bandit
-      run: bandit -r ./app -c .bandit.yml
+      run: poetry run bandit -r ./app
 
-    # Snyk Security Scan
-    - name: Run Snyk
-      uses: snyk/actions/python@master
-      continue-on-error: false
+    # Updated Snyk integration
+    - name: Setup Snyk
+      uses: snyk/actions/setup@master
+
+    - name: Run Snyk security scan
+      run: snyk test --file=poetry.lock --package-manager=poetry
       env:
         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      with:
-        command: test
-        args: --all-projects --file=./app/requirements.txt
