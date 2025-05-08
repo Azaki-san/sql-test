@@ -5,7 +5,10 @@ sync.py  –  upload / status helpers for SharedVideo backend
 """
 
 from __future__ import annotations
-import os, time, shutil, subprocess
+import os
+import time
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Final
 
@@ -17,15 +20,15 @@ from app.utils.viewer_count import get_viewer_count
 # ─────────────────────────────────────────────────────────────────────────────
 # configuration
 # ─────────────────────────────────────────────────────────────────────────────
-VIDEO_DIR: Final[Path] = Path("shared_video")   # writable, persisted via volume
+VIDEO_DIR: Final[Path] = Path("shared_video")  # writable, persisted via volume
 VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_EXTENSIONS: Final[set[str]] = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 ALLOWED_CONTENT_TYPES: Final[dict[str, str]] = {
-    ".mp4":  "video/mp4",
-    ".mov":  "video/quicktime",
-    ".avi":  "video/x-msvideo",
-    ".mkv":  "video/x-matroska",
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+    ".mkv": "video/x-matroska",
     ".webm": "video/webm",
 }
 
@@ -34,10 +37,11 @@ FFMPEG_CMD: str | None = None
 
 # in‑memory playback state
 _state: dict[str, float | str | None] = {
-    "filename":      None,  # str | None
-    "start_time":    None,  # float | None  (epoch seconds)
-    "expected_end":  None,  # float | None
+    "filename": None,  # str | None
+    "start_time": None,  # float | None  (epoch seconds)
+    "expected_end": None,  # float | None
 }
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # helpers
@@ -45,33 +49,36 @@ _state: dict[str, float | str | None] = {
 def _ensure_ffmpeg() -> None:
     """Locate ffmpeg executable the first time we need it."""
     global FFMPEG_CMD
-    if FFMPEG_CMD:                       # already found
+    if FFMPEG_CMD:  # already found
         return
 
     env = os.environ.get("FFMPEG_PATH")
     if env and Path(env).is_file():
-        FFMPEG_CMD = env; return
+        FFMPEG_CMD = env
+        return
 
     shim = shutil.which("ffmpeg")
     if shim:
-        FFMPEG_CMD = "ffmpeg"; return
+        FFMPEG_CMD = "ffmpeg"
+        return
 
     # fall‑back guesses
     guesses = ["/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg",
                "/opt/homebrew/bin/ffmpeg", "/snap/bin/ffmpeg"]
     if os.name == "nt":
         user = os.environ.get("USERPROFILE", "")
-        pf   = os.environ.get("ProgramFiles", "")
-        pfx  = os.environ.get("ProgramFiles(x86)", "")
+        pf = os.environ.get("ProgramFiles", "")
+        pfx = os.environ.get("ProgramFiles(x86)", "")
         guesses += [
             Path(user, "AppData/Local/Microsoft/WinGet/Links/ffmpeg.exe"),
-            Path(pf,  "Gyan/FFmpeg/bin/ffmpeg.exe"),
-            Path(pf,  "ffmpeg/bin/ffmpeg.exe"),
+            Path(pf, "Gyan/FFmpeg/bin/ffmpeg.exe"),
+            Path(pf, "ffmpeg/bin/ffmpeg.exe"),
             Path(pfx, "Gyan/FFmpeg/bin/ffmpeg.exe"),
         ]
     for g in guesses:
         if Path(g).is_file():
-            FFMPEG_CMD = str(g); return
+            FFMPEG_CMD = str(g)
+            return
 
     raise HTTPException(
         400,
@@ -93,7 +100,8 @@ def _validate_upload(file: UploadFile) -> None:
         if expected and file.content_type != expected:
             raise HTTPException(
                 400,
-                f"Wrong content‑type '{file.content_type}', expected '{expected}'",
+                f"Wrong content‑type '{file.content_type}'"
+                f", expected '{expected}'",
             )
 
 
@@ -127,7 +135,8 @@ def _expire_if_finished() -> None:
 # public API
 # ─────────────────────────────────────────────────────────────────────────────
 async def upload_video(file: UploadFile) -> dict:
-    """Save, validate and start playback. 409 if something is already playing."""
+    """Save, validate and start playback.
+    409 if something is already playing."""
     _expire_if_finished()
     if _state["filename"]:
         raise HTTPException(409, "A video is already playing")
@@ -145,9 +154,11 @@ async def upload_video(file: UploadFile) -> dict:
         raise
 
     now = time.time()
-    _state.update(filename=file.filename, start_time=now, expected_end=now + duration)
+    _state.update(filename=file.filename,
+                  start_time=now, expected_end=now + duration)
 
-    return {"message": "video uploaded", "filename": file.filename, "duration": duration}
+    return {"message": "video uploaded",
+            "filename": file.filename, "duration": duration}
 
 
 def get_video_status() -> dict:
@@ -158,7 +169,7 @@ def get_video_status() -> dict:
 
     elapsed = time.time() - float(_state["start_time"])  # type: ignore
     return {
-        "status":  "playing",
+        "status": "playing",
         "filename": _state["filename"],
         "elapsed": elapsed,
         "viewers": get_viewer_count(),

@@ -5,6 +5,7 @@ from app.services.weather import get_weather
 from app.db.database import increment_video_stat
 from app.services.sync import get_video_filename_path
 from app.db.database import get_video_stat
+from fastapi.responses import FileResponse
 
 router = APIRouter()
 
@@ -15,10 +16,10 @@ async def upload(file: UploadFile):
     increment_video_stat()
     return response
 
+
 @router.get("/stats")
 def stats():
     return {"total_played": get_video_stat()}
-
 
 
 @router.get("/status")
@@ -37,9 +38,6 @@ def ping(request: Request):
 def end():
     end_video()
     return {"message": "Video ended"}
-
-
-from fastapi.responses import FileResponse
 
 
 @router.get("/video")

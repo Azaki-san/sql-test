@@ -1,0 +1,60 @@
+name: Code Quality and Security Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  code-analysis:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install ruff flake8 bandit
+
+    # SonarQube Analysis
+#    - name: SonarQube Scan
+#      uses: SonarSource/sonarcloud-github-action@master
+#      env:
+#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+#      with:
+#        args: |
+#          -Dsonar.projectKey=${{ secrets.SONARQUBE_PROJECT_KEY }}
+#          -Dsonar.organization=${{ secrets.SONARQUBE_ORGANIZATION }}
+#          -Dsonar.python.version=3
+#          -Dsonar.sources=./app
+
+    # Ruff Linting
+    - name: Run Ruff
+      run: ruff check ./app
+
+    # Flake8 Linting
+    - name: Run Flake8
+      run: flake8 ./app
+
+    # Bandit Security Scan
+    - name: Run Bandit
+      run: bandit -r ./app -c .bandit.yml
+
+    # Snyk Security Scan
+    - name: Run Snyk
+      uses: snyk/actions/python@master
+      continue-on-error: false
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        command: test
+        args: --all-projects --file=./app/requirements.txt
