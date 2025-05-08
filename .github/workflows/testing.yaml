@@ -30,17 +30,17 @@ jobs:
       run: poetry install --no-interaction --no-root
 
     # SonarQube Analysis (existing)
-#    - name: SonarQube Scan
-#      uses: SonarSource/sonarcloud-github-action@master
-#      env:
-#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#        SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-#      with:
-#        args: |
-#          -Dsonar.projectKey=${{ secrets.SONARQUBE_PROJECT_KEY }}
-#          -Dsonar.organization=${{ secrets.SONARQUBE_ORGANIZATION }}
-#          -Dsonar.python.version=3
-#          -Dsonar.sources=./app
+    - name: SonarQube Scan
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+      with:
+        args: |
+          -Dsonar.projectKey=${{ secrets.SONARQUBE_PROJECT_KEY }}
+          -Dsonar.organization=${{ secrets.SONARQUBE_ORGANIZATION }}
+          -Dsonar.python.version=3
+          -Dsonar.sources=./app
 
     # Linters (existing)
     - name: Run Ruff
